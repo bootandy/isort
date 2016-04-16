@@ -1782,3 +1782,15 @@ def test_plone_style():
     options = {'force_single_line': True,
                'force_alphabetical_sort': True}
     assert SortImports(file_contents=test_input, **options).output == test_input
+
+
+def test_ignore_line():
+    """Test to ensure isort can break its imports up into groups and sort each group"""
+    test_input = ("from coalib import assert_supported_version\n"
+                  "\n"
+                  "assert_supported_version()  # isort:split-import-group\n"
+                  "\n"
+                  "# Now begin all other imports\n"
+                  "import locale\n"
+                  "import sys\n")
+    assert SortImports(file_contents=test_input).output == test_input

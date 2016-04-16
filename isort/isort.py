@@ -124,22 +124,35 @@ class SortImports(object):
         self.number_of_lines = len(self.in_lines)
 
         self.out_lines = []
-        self.comments = {'from': {}, 'straight': {}, 'nested': {}, 'above': {'straight': {}, 'from': {}}}
-        self.imports = {}
-        self.as_map = {}
-
-        section_names = self.config.get('sections')
-        self.sections = namedtuple('Sections', section_names)(*[name for name in section_names])
-        for section in itertools.chain(self.sections, self.config['forced_separate']):
-            self.imports[section] = {'straight': set(), 'from': {}}
-
         self.index = 0
-        self.import_index = -1
-        self._first_comment_index_start = -1
-        self._first_comment_index_end = -1
-        self._parse()
-        if self.import_index != -1:
-            self._add_formatted_imports()
+        line_start_index = self.index
+
+        while not self._at_end():  #Test this crazy idea
+            line = self._get_line()
+
+            if self._mark_import_boundry(line) or self._at_end():
+                # continue from line_start -> line
+                line_end_index = self.index
+                self.index = line_start_index
+                line_start_index = line_end_index
+
+                # pull below out to separate func
+                self.comments = {'from': {}, 'straight': {}, 'nested': {}, 'above': {'straight': {}, 'from': {}}}
+                self.imports = {}
+                self.as_map = {}
+
+                section_names = self.config.get('sections')
+                self.sections = namedtuple('Sections', section_names)(*[name for name in section_names])
+                for section in itertools.chain(self.sections, self.config['forced_separate']):
+                    self.imports[section] = {'straight': set(), 'from': {}}
+
+                self.import_index = -1
+                self._first_comment_index_start = -1
+                self._first_comment_index_end = -1
+                self._parse(line_end_index)
+                if self.import_index != -1:
+                    self._add_formatted_imports()
+
 
         self.length_change = len(self.out_lines) - self.original_length
         while self.out_lines and self.out_lines[-1].strip() == "":
@@ -667,6 +680,9 @@ class SortImports(object):
 
         return import_line
 
+    def _mark_import_boundry(self, line):
+        return "# isort:split-import-group" in line
+
     def _skip_line(self, line):
         skip_line = self._in_quote
         if self.index == 1 and line.startswith("#"):
@@ -714,11 +730,11 @@ class SortImports(object):
         import_string = import_string.replace("[[i]]", "_import")
         return import_string.replace("{ ", "{|").replace(" }", "|}")
 
-    def _parse(self):
+    def _parse(self, line_end_index):
         """Parses a python file taking out and categorizing imports."""
         self._in_quote = False
         self._in_top_comment = False
-        while not self._at_end():
+        while self.index != line_end_index:
             line = self._get_line()
             statement_index = self.index
             skip_line = self._skip_line(line)
